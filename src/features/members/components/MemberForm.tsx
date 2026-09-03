@@ -11,17 +11,23 @@ import { todayISO } from "../format";
 
 export type MemberFormValues = MemberInput;
 
+type NumberCheck =
+  | { state: "idle" }
+  | { state: "checking" }
+  | { state: "available" }
+  | { state: "taken"; name: string };
+
 type Errors = Partial<Record<keyof MemberFormValues, string>>;
 
 interface Props {
   mode: "create" | "edit";
-  initial?: Partial<MemberFormValues>;
+  initial?: Partial<MemberFormValues> | undefined;
   submitting: boolean;
-  formError?: string | null;
-  fieldError?: Errors;
+  formError?: string | null | undefined;
+  fieldError?: Errors | undefined;
   onSubmit: (values: MemberFormValues) => void;
   onCancel: () => void;
-  onDirtyChange?: (dirty: boolean) => void;
+  onDirtyChange?: ((dirty: boolean) => void) | undefined;
   /** Rendered inside a sticky bar on mobile in create mode. */
   stickyActions?: boolean;
 }
@@ -45,9 +51,7 @@ export function MemberForm({
     notes: initial?.notes ?? "",
   });
   const [errors, setErrors] = useState<Errors>({});
-  const [numberCheck, setNumberCheck] = useState<
-    { state: "idle" | "checking" } | { state: "available" } | { state: "taken"; name: string }
-  >({ state: "idle" });
+  const [numberCheck, setNumberCheck] = useState<NumberCheck>({ state: "idle" });
   const [showNotes, setShowNotes] = useState(Boolean(initial?.notes));
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -171,7 +175,7 @@ export function MemberForm({
                     <Check className="size-3" aria-hidden /> Available
                   </>
                 ) : (
-                  `Already used by ${numberCheck.name}.`
+                  `Already used by ${(numberCheck as { name: string }).name}.`
                 )}
               </p>
             ) : null}
@@ -291,9 +295,9 @@ function Field({
 }: {
   id: string;
   label: string;
-  optional?: boolean;
-  hint?: string;
-  error?: string;
+  optional?: boolean | undefined;
+  hint?: string | undefined;
+  error?: string | undefined;
   children: React.ReactNode;
 }) {
   return (
