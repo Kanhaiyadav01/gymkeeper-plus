@@ -40,7 +40,7 @@ export function StatusBadge({
   className,
 }: {
   status: MemberDisplayStatus;
-  className?: string;
+  className?: string | undefined;
 }) {
   const { label, tone } = MAP[status];
   return (

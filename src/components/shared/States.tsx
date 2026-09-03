@@ -12,9 +12,9 @@ export function EmptyState({
 }: {
   icon: LucideIcon;
   title: string;
-  body?: string;
+  body?: string | undefined;
   action?: React.ReactNode;
-  className?: string;
+  className?: string | undefined;
 }) {
   return (
     <div className={cn("flex flex-col items-center px-6 py-12 text-center", className)}>
@@ -34,10 +34,10 @@ export function ErrorState({
   onRetry,
   className,
 }: {
-  title?: string;
-  body?: string;
-  onRetry?: () => void;
-  className?: string;
+  title?: string | undefined;
+  body?: string | undefined;
+  onRetry?: (() => void) | undefined;
+  className?: string | undefined;
 }) {
   return (
     <div

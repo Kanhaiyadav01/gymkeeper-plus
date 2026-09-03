@@ -15,8 +15,8 @@ export function MemberAvatar({
   className,
 }: {
   name: string;
-  size?: "sm" | "md" | "lg";
-  className?: string;
+  size?: "sm" | "md" | "lg" | undefined;
+  className?: string | undefined;
 }) {
   const sizes = {
     sm: "size-8 text-xs",
