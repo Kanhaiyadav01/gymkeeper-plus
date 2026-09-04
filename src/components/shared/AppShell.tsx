@@ -98,6 +98,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               {item.enabled ? (
                 <Link
                   to={item.to}
+                  search={{ q: "", status: "all", sort: "recent", page: 1 }}
                   className={cn(
                     "flex h-16 flex-col items-center justify-center gap-1 text-[11px] font-medium",
                     isMembers && item.to === "/members"
