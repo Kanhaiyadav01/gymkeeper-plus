@@ -37,6 +37,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <Link
                 key={item.to}
                 to={item.to}
+                search={{ q: "", status: "all", sort: "recent", page: 1 }}
                 className={cn(
                   "flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors",
                   isMembers && item.to === "/members"
@@ -97,6 +98,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               {item.enabled ? (
                 <Link
                   to={item.to}
+                  search={{ q: "", status: "all", sort: "recent", page: 1 }}
                   className={cn(
                     "flex h-16 flex-col items-center justify-center gap-1 text-[11px] font-medium",
                     isMembers && item.to === "/members"
