@@ -5,7 +5,9 @@
  * The boundary is deliberately shaped like the real one:
  *  - every read/write is scoped to the tenant from getTenantContext()
  *  - gymId is never accepted from a caller argument
- *  - membership status / expiry is computed here, never in the UI
+ *  - membership status / expiry / renewal maths is computed here, never in the UI
+ *  - membership + payment creation happens together (transaction boundary)
+ *  - payments are never deleted, only voided
  *  - errors use the { code, message } envelope
  */
 import { addMonths, differenceInCalendarDays, format } from "date-fns";
@@ -17,6 +19,13 @@ import type {
   Paginated,
 } from "@/features/members/types";
 import type { MemberEditInput, MemberInput } from "@/features/members/schema";
+import type {
+  Membership,
+  MembershipDuration,
+  Payment,
+  PaymentMethod,
+  RenewInput,
+} from "@/features/memberships/types";
 
 export class ApiClientError extends Error {
   code: string;
@@ -36,7 +45,28 @@ interface MemberRow {
   joiningDate: string;
   notes: string | null;
   lifecycle: "ACTIVE" | "LEFT_GYM";
-  membership: { id: string; startDate: string; durationMonths: number } | null;
+  createdAt: string;
+}
+
+interface MembershipRow {
+  id: string;
+  gymId: string;
+  memberId: string;
+  startDate: string;
+  endDate: string;
+  durationMonths: MembershipDuration;
+  createdAt: string;
+}
+
+interface PaymentRow {
+  id: string;
+  gymId: string;
+  memberId: string;
+  membershipId: string;
+  amount: number;
+  paymentMethod: PaymentMethod;
+  paymentDate: string;
+  status: "ACTIVE" | "VOID";
   createdAt: string;
 }
 
@@ -44,6 +74,8 @@ export const PAGE_SIZE = 20;
 
 const iso = (d: Date) => format(d, "yyyy-MM-dd");
 const today = () => new Date();
+const todayISO = () => iso(today());
+const parse = (d: string) => new Date(`${d}T00:00:00`);
 
 function daysAgo(n: number) {
   const d = today();
@@ -51,8 +83,25 @@ function daysAgo(n: number) {
   return iso(d);
 }
 
+function addDays(isoDate: string, n: number) {
+  const d = parse(isoDate);
+  d.setDate(d.getDate() + n);
+  return iso(d);
+}
+
+/** End date = start + duration months, minus one day. Gym timezone assumed. */
+function endDateFor(startDate: string, durationMonths: number): string {
+  const end = addMonths(parse(startDate), durationMonths);
+  end.setDate(end.getDate() - 1);
+  return iso(end);
+}
+
 let seq = 0;
-const nextId = () => `mem_${(++seq).toString().padStart(4, "0")}`;
+const nextId = (prefix: string) => `${prefix}_${(++seq).toString().padStart(4, "0")}`;
+
+const memberRows: MemberRow[] = [];
+const membershipRows: MembershipRow[] = [];
+const paymentRows: PaymentRow[] = [];
 
 function seedMember(
   gymId: string,
@@ -60,12 +109,17 @@ function seedMember(
   name: string,
   phone: string | null,
   joinedDaysAgo: number,
-  membership: { startedDaysAgo: number; durationMonths: number } | null,
+  membership: {
+    startedDaysAgo: number;
+    durationMonths: MembershipDuration;
+    amount: number;
+    method: PaymentMethod;
+  } | null,
   lifecycle: "ACTIVE" | "LEFT_GYM" = "ACTIVE",
   notes: string | null = null,
-): MemberRow {
-  return {
-    id: nextId(),
+) {
+  const member: MemberRow = {
+    id: nextId("mem"),
     gymId,
     memberNumber,
     name,
@@ -73,49 +127,65 @@ function seedMember(
     joiningDate: daysAgo(joinedDaysAgo),
     notes,
     lifecycle,
-    membership: membership
-      ? {
-          id: `msh_${memberNumber}`,
-          startDate: daysAgo(membership.startedDaysAgo),
-          durationMonths: membership.durationMonths,
-        }
-      : null,
     createdAt: daysAgo(joinedDaysAgo),
   };
+  memberRows.push(member);
+
+  if (membership) {
+    const startDate = daysAgo(membership.startedDaysAgo);
+    const ms: MembershipRow = {
+      id: nextId("msh"),
+      gymId,
+      memberId: member.id,
+      startDate,
+      endDate: endDateFor(startDate, membership.durationMonths),
+      durationMonths: membership.durationMonths,
+      createdAt: startDate,
+    };
+    membershipRows.push(ms);
+    paymentRows.push({
+      id: nextId("pay"),
+      gymId,
+      memberId: member.id,
+      membershipId: ms.id,
+      amount: membership.amount,
+      paymentMethod: membership.method,
+      paymentDate: startDate,
+      status: "ACTIVE",
+      createdAt: startDate,
+    });
+  }
 }
 
 /** Two gyms are seeded on purpose so tenant scoping is observable. */
-const rows: MemberRow[] = [
-  seedMember("gym_001", "01045", "Rahul Kumar", "9876543210", 88, { startedDaysAgo: 88, durationMonths: 3 }),
-  seedMember("gym_001", "01046", "Amit Kumar", "9876543210", 85, { startedDaysAgo: 85, durationMonths: 3 }),
-  seedMember("gym_001", "01047", "Priya Sharma", "9812345678", 200, { startedDaysAgo: 12, durationMonths: 1 }),
-  seedMember("gym_001", "01048", "Sneha Patel", null, 150, { startedDaysAgo: 48, durationMonths: 3 }, "ACTIVE", "Prefers evening slot."),
-  seedMember("gym_001", "01049", "Vikram Singh", "9900112233", 320, { startedDaysAgo: 250, durationMonths: 3 }),
-  seedMember("gym_001", "01050", "Neha Gupta", "9876501234", 40, { startedDaysAgo: 40, durationMonths: 1 }),
-  seedMember("gym_001", "01051", "Arjun Mehta", "9765432100", 500, { startedDaysAgo: 400, durationMonths: 3 }, "LEFT_GYM"),
-  seedMember("gym_001", "01052", "Kavya Nair", "9812345678", 25, { startedDaysAgo: 25, durationMonths: 3 }),
-  seedMember("gym_001", "01053", "Rohit Verma", null, 10, null, "ACTIVE", "Joined on a trial, membership pending."),
-  seedMember("gym_001", "01054", "Ananya Rao", "9123456780", 62, { startedDaysAgo: 62, durationMonths: 3 }),
-  seedMember("gym_001", "01055", "Karan Malhotra", "9012345678", 120, { startedDaysAgo: 5, durationMonths: 1 }),
-  seedMember("gym_001", "01056", "Divya Menon", "9345678901", 30, { startedDaysAgo: 30, durationMonths: 1 }),
-  // Different tenant. Must never be visible to gym_001.
-  seedMember("gym_002", "01045", "XYZ Fitness Member", "9000000000", 30, { startedDaysAgo: 30, durationMonths: 1 }),
-];
-
-function endDateOf(row: MemberRow): string | null {
-  if (!row.membership) return null;
-  const start = new Date(`${row.membership.startDate}T00:00:00`);
-  const end = addMonths(start, row.membership.durationMonths);
-  end.setDate(end.getDate() - 1);
-  return iso(end);
-}
+seedMember("gym_001", "01045", "Rahul Kumar", "9876543210", 88, { startedDaysAgo: 88, durationMonths: 3, amount: 2500, method: "CASH" });
+seedMember("gym_001", "01046", "Amit Kumar", "9876543210", 85, { startedDaysAgo: 85, durationMonths: 3, amount: 2500, method: "UPI" });
+seedMember("gym_001", "01047", "Priya Sharma", "9812345678", 200, { startedDaysAgo: 12, durationMonths: 1, amount: 1000, method: "UPI" });
+seedMember("gym_001", "01048", "Sneha Patel", null, 150, { startedDaysAgo: 48, durationMonths: 3, amount: 2500, method: "CASH" }, "ACTIVE", "Prefers evening slot.");
+seedMember("gym_001", "01049", "Vikram Singh", "9900112233", 320, { startedDaysAgo: 250, durationMonths: 3, amount: 2400, method: "CASH" });
+seedMember("gym_001", "01050", "Neha Gupta", "9876501234", 40, { startedDaysAgo: 40, durationMonths: 1, amount: 1000, method: "UPI" });
+seedMember("gym_001", "01051", "Arjun Mehta", "9765432100", 500, { startedDaysAgo: 400, durationMonths: 3, amount: 2400, method: "CASH" }, "LEFT_GYM");
+seedMember("gym_001", "01052", "Kavya Nair", "9812345678", 25, { startedDaysAgo: 25, durationMonths: 3, amount: 2500, method: "UPI" });
+seedMember("gym_001", "01053", "Rohit Verma", null, 10, null, "ACTIVE", "Joined on a trial, membership pending.");
+seedMember("gym_001", "01054", "Ananya Rao", "9123456780", 62, { startedDaysAgo: 62, durationMonths: 3, amount: 2500, method: "CASH" });
+seedMember("gym_001", "01055", "Karan Malhotra", "9012345678", 120, { startedDaysAgo: 5, durationMonths: 1, amount: 1000, method: "UPI" });
+seedMember("gym_001", "01056", "Divya Menon", "9345678901", 30, { startedDaysAgo: 30, durationMonths: 1, amount: 1000, method: "CASH" });
+// Different tenant. Must never be visible to gym_001.
+seedMember("gym_002", "01045", "XYZ Fitness Member", "9000000000", 30, { startedDaysAgo: 30, durationMonths: 1, amount: 900, method: "CASH" });
 
 const EXPIRING_SOON_DAYS = 7;
 
+/** Latest membership by end date — the one that determines current status. */
+function currentMembershipRow(memberId: string): MembershipRow | null {
+  const list = membershipRows
+    .filter((m) => m.memberId === memberId)
+    .sort((a, b) => a.endDate.localeCompare(b.endDate));
+  return list.length ? list[list.length - 1]! : null;
+}
+
 function toMember(row: MemberRow): Member {
-  const end = endDateOf(row);
-  const daysRemaining =
-    end === null ? null : differenceInCalendarDays(new Date(`${end}T00:00:00`), new Date(iso(today()) + "T00:00:00"));
+  const ms = currentMembershipRow(row.id);
+  const daysRemaining = ms === null ? null : differenceInCalendarDays(parse(ms.endDate), parse(todayISO()));
 
   let displayStatus: MemberDisplayStatus;
   if (row.lifecycle === "LEFT_GYM") displayStatus = "LEFT_GYM";
@@ -132,15 +202,14 @@ function toMember(row: MemberRow): Member {
     joiningDate: row.joiningDate,
     notes: row.notes,
     lifecycle: row.lifecycle,
-    currentMembership:
-      row.membership && end
-        ? {
-            id: row.membership.id,
-            startDate: row.membership.startDate,
-            endDate: end,
-            durationMonths: row.membership.durationMonths,
-          }
-        : null,
+    currentMembership: ms
+      ? {
+          id: ms.id,
+          startDate: ms.startDate,
+          endDate: ms.endDate,
+          durationMonths: ms.durationMonths,
+        }
+      : null,
     displayStatus,
     daysRemaining,
     createdAt: row.createdAt,
@@ -152,15 +221,24 @@ const latency = (ms = 260) => new Promise((r) => setTimeout(r, ms));
 /** Tenant-scoped row access. Every query starts here. */
 function tenantRows(): MemberRow[] {
   const { gymId } = getTenantContext();
-  return rows.filter((r) => r.gymId === gymId);
+  return memberRows.filter((r) => r.gymId === gymId);
 }
 
 function requireRow(memberId: string): MemberRow {
   const { gymId } = getTenantContext();
-  const row = rows.find((r) => r.id === memberId);
+  const row = memberRows.find((r) => r.id === memberId);
   // A row belonging to another gym is indistinguishable from a missing row.
   if (!row || row.gymId !== gymId) {
     throw new ApiClientError("MEMBER_NOT_FOUND", "This member could not be found.");
+  }
+  return row;
+}
+
+function requirePayment(paymentId: string): PaymentRow {
+  const { gymId } = getTenantContext();
+  const row = paymentRows.find((p) => p.id === paymentId);
+  if (!row || row.gymId !== gymId) {
+    throw new ApiClientError("PAYMENT_NOT_FOUND", "This payment could not be found.");
   }
   return row;
 }
@@ -239,7 +317,7 @@ export async function createMember(input: MemberInput): Promise<Member> {
     );
   }
   const row: MemberRow = {
-    id: nextId(),
+    id: nextId("mem"),
     gymId,
     memberNumber: input.memberNumber.trim(),
     name: input.name.trim(),
@@ -247,10 +325,9 @@ export async function createMember(input: MemberInput): Promise<Member> {
     joiningDate: input.joiningDate,
     notes: input.notes.trim() || null,
     lifecycle: "ACTIVE",
-    membership: null,
-    createdAt: iso(today()),
+    createdAt: todayISO(),
   };
-  rows.push(row);
+  memberRows.push(row);
   return toMember(row);
 }
 
@@ -272,4 +349,139 @@ export async function setMemberLifecycle(
   const row = requireRow(memberId);
   row.lifecycle = lifecycle;
   return toMember(row);
+}
+
+/* -------------------------------------------------------------------------
+ * Memberships + payments
+ * ---------------------------------------------------------------------- */
+
+function toMembership(row: MembershipRow): Membership {
+  const daysRemaining = differenceInCalendarDays(parse(row.endDate), parse(todayISO()));
+  return {
+    id: row.id,
+    memberId: row.memberId,
+    startDate: row.startDate,
+    endDate: row.endDate,
+    durationMonths: row.durationMonths,
+    isCurrent: currentMembershipRow(row.memberId)?.id === row.id,
+    isActive: daysRemaining >= 0 && parse(row.startDate) <= parse(todayISO()),
+    createdAt: row.createdAt,
+  };
+}
+
+function toPayment(row: PaymentRow): Payment {
+  return {
+    id: row.id,
+    memberId: row.memberId,
+    membershipId: row.membershipId,
+    amount: row.amount,
+    paymentMethod: row.paymentMethod,
+    paymentDate: row.paymentDate,
+    status: row.status,
+    createdAt: row.createdAt,
+  };
+}
+
+export async function listMemberships(memberId: string): Promise<Membership[]> {
+  await latency(200);
+  const row = requireRow(memberId);
+  return membershipRows
+    .filter((m) => m.memberId === row.id)
+    .sort((a, b) => b.startDate.localeCompare(a.startDate))
+    .map(toMembership);
+}
+
+export async function listPayments(memberId: string): Promise<Payment[]> {
+  await latency(200);
+  const row = requireRow(memberId);
+  return paymentRows
+    .filter((p) => p.memberId === row.id)
+    .sort((a, b) => b.paymentDate.localeCompare(a.paymentDate) || b.id.localeCompare(a.id))
+    .map(toPayment);
+}
+
+/**
+ * Renewal rules (server-side, never trusted from the client):
+ *  - renewing while active or on the expiry date -> starts the day after the
+ *    current end date, so no paid days are lost
+ *  - renewing after expiry (or with no prior membership) -> starts on the
+ *    renewal date; the gap is never backfilled
+ * Membership + payment are created together.
+ */
+export function previewRenewalStart(currentEndDate: string | null, renewalDate: string): string {
+  if (!currentEndDate) return renewalDate;
+  return renewalDate <= currentEndDate ? addDays(currentEndDate, 1) : renewalDate;
+}
+
+export async function renewMembership(
+  memberId: string,
+  input: RenewInput,
+): Promise<{ membership: Membership; payment: Payment }> {
+  await latency(460);
+  const { gymId } = getTenantContext();
+  const member = requireRow(memberId);
+
+  if (input.amount <= 0) {
+    throw new ApiClientError("INVALID_PAYMENT_AMOUNT", "Payment amount must be greater than zero.");
+  }
+  if (input.paymentMethod !== "CASH" && input.paymentMethod !== "UPI") {
+    throw new ApiClientError("INVALID_PAYMENT_METHOD", "Choose either cash or UPI.");
+  }
+
+  const current = currentMembershipRow(member.id);
+  const startDate = previewRenewalStart(current?.endDate ?? null, input.renewalDate);
+
+  const membership: MembershipRow = {
+    id: nextId("msh"),
+    gymId,
+    memberId: member.id,
+    startDate,
+    endDate: endDateFor(startDate, input.durationMonths),
+    durationMonths: input.durationMonths,
+    createdAt: todayISO(),
+  };
+  const payment: PaymentRow = {
+    id: nextId("pay"),
+    gymId,
+    memberId: member.id,
+    membershipId: membership.id,
+    amount: input.amount,
+    paymentMethod: input.paymentMethod,
+    paymentDate: input.renewalDate,
+    status: "ACTIVE",
+    createdAt: todayISO(),
+  };
+
+  // Single transaction boundary: both rows land, or neither does.
+  membershipRows.push(membership);
+  paymentRows.push(payment);
+  // A returning member becomes active again on renewal.
+  member.lifecycle = "ACTIVE";
+
+  return { membership: toMembership(membership), payment: toPayment(payment) };
+}
+
+/** Editing an amount never touches membership dates. */
+export async function updatePaymentAmount(paymentId: string, amount: number): Promise<Payment> {
+  await latency(320);
+  const row = requirePayment(paymentId);
+  if (row.status === "VOID") {
+    throw new ApiClientError("PAYMENT_ALREADY_VOID", "A voided payment can't be edited.");
+  }
+  if (amount <= 0) {
+    throw new ApiClientError("INVALID_PAYMENT_AMOUNT", "Payment amount must be greater than zero.");
+  }
+  row.amount = amount;
+  return toPayment(row);
+}
+
+/** Payments are never deleted; voiding keeps history and drops it from totals. */
+export async function voidPayment(paymentId: string): Promise<Payment> {
+  await latency(320);
+  const row = requirePayment(paymentId);
+  if (row.status === "VOID") {
+    throw new ApiClientError("PAYMENT_ALREADY_VOID", "This payment is already void.");
+  }
+  row.status = "VOID";
+  return toPayment(row);
 }
