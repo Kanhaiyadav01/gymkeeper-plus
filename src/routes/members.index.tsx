@@ -57,12 +57,14 @@ export const Route = createFileRoute("/members/")({
     ],
   }),
   validateSearch: (search: Record<string, unknown>) => ({
-    q: typeof search.q === "string" ? search.q : "",
-    status: (STATUSES.includes(search.status as MemberStatusFilter)
-      ? search.status
+    q: typeof search["q"] === "string" ? search["q"] : "",
+    status: (STATUSES.includes(search["status"] as MemberStatusFilter)
+      ? search["status"]
       : "all") as MemberStatusFilter,
-    sort: (SORTS.includes(search.sort as MemberSort) ? search.sort : "recent") as MemberSort,
-    page: Math.max(1, Number(search.page ?? 1) || 1),
+    sort: (SORTS.includes(search["sort"] as MemberSort)
+      ? search["sort"]
+      : "recent") as MemberSort,
+    page: Math.max(1, Number(search["page"] ?? 1) || 1),
   }),
   component: MembersPage,
 });
