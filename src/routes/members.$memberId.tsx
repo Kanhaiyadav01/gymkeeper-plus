@@ -28,8 +28,18 @@ import { ErrorState } from "@/components/shared/States";
 import { MemberForm, type MemberFormValues } from "@/features/members/components/MemberForm";
 import { memberQueryOptions, membersApi } from "@/features/members/api";
 import { expiryRelative, formatDate } from "@/features/members/format";
+import {
+  membershipsApi,
+  membershipsQueryOptions,
+  paymentsQueryOptions,
+} from "@/features/memberships/api";
+import { MembershipHistory } from "@/features/memberships/components/MembershipHistory";
+import { PaymentHistory } from "@/features/memberships/components/PaymentHistory";
+import { RenewSheet } from "@/features/memberships/components/RenewSheet";
+import type { RenewInput } from "@/features/memberships/types";
 import { ApiClientError } from "@/lib/api/mock-store";
 import type { Member } from "@/features/members/types";
+
 
 const LIST_SEARCH = { q: "", status: "all", sort: "recent", page: 1 } as const;
 
@@ -102,11 +112,52 @@ function MemberDetail({ member }: { member: Member }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
+  const [renewing, setRenewing] = useState(false);
+
+  const memberships = useQuery(membershipsQueryOptions(member.id));
+  const payments = useQuery(paymentsQueryOptions(member.id));
 
   const invalidate = async () => {
     await queryClient.invalidateQueries({ queryKey: ["member", member.id] });
     await queryClient.invalidateQueries({ queryKey: ["members"] });
+    await queryClient.invalidateQueries({ queryKey: ["memberships", member.id] });
+    await queryClient.invalidateQueries({ queryKey: ["payments", member.id] });
   };
+
+  const renew = useMutation({
+    mutationFn: (input: RenewInput) => membershipsApi.renew(member.id, input),
+    onSuccess: async () => {
+      await invalidate();
+      setRenewing(false);
+      toast.success("Membership renewed and payment recorded");
+    },
+    onError: (error) =>
+      toast.error(
+        error instanceof ApiClientError ? error.message : "Couldn't renew this membership.",
+      ),
+  });
+
+  const editAmount = useMutation({
+    mutationFn: ({ paymentId, amount }: { paymentId: string; amount: number }) =>
+      membershipsApi.updatePaymentAmount(paymentId, amount),
+    onSuccess: async () => {
+      await invalidate();
+      toast.success("Payment amount corrected");
+    },
+    onError: (error) =>
+      toast.error(error instanceof ApiClientError ? error.message : "Couldn't save that amount."),
+  });
+
+  const voidPay = useMutation({
+    mutationFn: (paymentId: string) => membershipsApi.voidPayment(paymentId),
+    onSuccess: async () => {
+      await invalidate();
+      toast.success("Payment voided — it stays in history");
+    },
+    onError: (error) =>
+      toast.error(error instanceof ApiClientError ? error.message : "Couldn't void that payment."),
+  });
+
 
   const update = useMutation({
     mutationFn: (values: MemberFormValues) =>
@@ -175,15 +226,41 @@ function MemberDetail({ member }: { member: Member }) {
           />
           <Detail icon={CreditCard} label="Notes" value={member.notes ?? "—"} />
         </dl>
+
+        <Button className="mt-6 h-12 w-full sm:w-auto" onClick={() => setRenewing(true)}>
+          <CreditCard className="size-4" aria-hidden />
+          {member.currentMembership ? "Renew membership" : "Record first membership"}
+        </Button>
       </section>
 
-      <section className="mt-4 grid gap-4 sm:grid-cols-2">
-        <PhaseCard
-          title="Payments"
-          body="Payment history and renewals arrive with membership management."
+
+      <div className="mt-4 space-y-4">
+        <MembershipHistory
+          memberships={memberships.data}
+          isPending={memberships.isPending}
+          isError={memberships.isError}
+          onRetry={() => void memberships.refetch()}
         />
-        <PhaseCard title="Attendance" body="Daily attendance history arrives in a later phase." />
-      </section>
+        <PaymentHistory
+          payments={payments.data}
+          isPending={payments.isPending}
+          isError={payments.isError}
+          onRetry={() => void payments.refetch()}
+          onEditAmount={(paymentId, amount) => editAmount.mutate({ paymentId, amount })}
+          onVoid={(paymentId) => voidPay.mutate(paymentId)}
+          mutating={editAmount.isPending || voidPay.isPending}
+        />
+      </div>
+
+      <RenewSheet
+        open={renewing}
+        onOpenChange={setRenewing}
+        memberName={member.name}
+        currentEndDate={member.currentMembership?.endDate ?? null}
+        submitting={renew.isPending}
+        onSubmit={(input) => renew.mutate(input)}
+      />
+
 
       <section className="mt-4 rounded-xl border border-border bg-card p-4 sm:p-6">
         <h2 className="text-base font-semibold">Lifecycle</h2>
@@ -266,18 +343,6 @@ function Detail({
         <dt className="text-xs text-muted-foreground">{label}</dt>
         <dd className="text-sm font-medium break-words">{value}</dd>
       </div>
-    </div>
-  );
-}
-
-function PhaseCard({ title, body }: { title: string; body: string }) {
-  return (
-    <div
-      aria-disabled="true"
-      className="rounded-xl border border-dashed border-border bg-card/60 p-4"
-    >
-      <h2 className="text-sm font-semibold text-muted-foreground">{title}</h2>
-      <p className="mt-1 text-sm text-muted-foreground/80">{body}</p>
     </div>
   );
 }
