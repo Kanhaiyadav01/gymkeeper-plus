@@ -28,8 +28,18 @@ import { ErrorState } from "@/components/shared/States";
 import { MemberForm, type MemberFormValues } from "@/features/members/components/MemberForm";
 import { memberQueryOptions, membersApi } from "@/features/members/api";
 import { expiryRelative, formatDate } from "@/features/members/format";
+import {
+  membershipsApi,
+  membershipsQueryOptions,
+  paymentsQueryOptions,
+} from "@/features/memberships/api";
+import { MembershipHistory } from "@/features/memberships/components/MembershipHistory";
+import { PaymentHistory } from "@/features/memberships/components/PaymentHistory";
+import { RenewSheet } from "@/features/memberships/components/RenewSheet";
+import type { RenewInput } from "@/features/memberships/types";
 import { ApiClientError } from "@/lib/api/mock-store";
 import type { Member } from "@/features/members/types";
+
 
 const LIST_SEARCH = { q: "", status: "all", sort: "recent", page: 1 } as const;
 
