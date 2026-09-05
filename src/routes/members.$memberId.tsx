@@ -226,7 +226,13 @@ function MemberDetail({ member }: { member: Member }) {
           />
           <Detail icon={CreditCard} label="Notes" value={member.notes ?? "—"} />
         </dl>
+
+        <Button className="mt-6 h-12 w-full sm:w-auto" onClick={() => setRenewing(true)}>
+          <CreditCard className="size-4" aria-hidden />
+          {member.currentMembership ? "Renew membership" : "Record first membership"}
+        </Button>
       </section>
+
 
       <div className="mt-4 space-y-4">
         <MembershipHistory
