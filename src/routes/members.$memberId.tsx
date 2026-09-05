@@ -340,15 +340,3 @@ function Detail({
     </div>
   );
 }
-
-function PhaseCard({ title, body }: { title: string; body: string }) {
-  return (
-    <div
-      aria-disabled="true"
-      className="rounded-xl border border-dashed border-border bg-card/60 p-4"
-    >
-      <h2 className="text-sm font-semibold text-muted-foreground">{title}</h2>
-      <p className="mt-1 text-sm text-muted-foreground/80">{body}</p>
-    </div>
-  );
-}
