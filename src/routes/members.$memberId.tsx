@@ -177,13 +177,33 @@ function MemberDetail({ member }: { member: Member }) {
         </dl>
       </section>
 
-      <section className="mt-4 grid gap-4 sm:grid-cols-2">
-        <PhaseCard
-          title="Payments"
-          body="Payment history and renewals arrive with membership management."
+      <div className="mt-4 space-y-4">
+        <MembershipHistory
+          memberships={memberships.data}
+          isPending={memberships.isPending}
+          isError={memberships.isError}
+          onRetry={() => void memberships.refetch()}
         />
-        <PhaseCard title="Attendance" body="Daily attendance history arrives in a later phase." />
-      </section>
+        <PaymentHistory
+          payments={payments.data}
+          isPending={payments.isPending}
+          isError={payments.isError}
+          onRetry={() => void payments.refetch()}
+          onEditAmount={(paymentId, amount) => editAmount.mutate({ paymentId, amount })}
+          onVoid={(paymentId) => voidPay.mutate(paymentId)}
+          mutating={editAmount.isPending || voidPay.isPending}
+        />
+      </div>
+
+      <RenewSheet
+        open={renewing}
+        onOpenChange={setRenewing}
+        memberName={member.name}
+        currentEndDate={member.currentMembership?.endDate ?? null}
+        submitting={renew.isPending}
+        onSubmit={(input) => renew.mutate(input)}
+      />
+
 
       <section className="mt-4 rounded-xl border border-border bg-card p-4 sm:p-6">
         <h2 className="text-base font-semibold">Lifecycle</h2>
