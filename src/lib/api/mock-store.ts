@@ -26,6 +26,7 @@ import type {
   PaymentMethod,
   RenewInput,
 } from "@/features/memberships/types";
+import type { DashboardSummary } from "@/features/dashboard/types";
 
 export class ApiClientError extends Error {
   code: string;
@@ -484,4 +485,54 @@ export async function voidPayment(paymentId: string): Promise<Payment> {
   }
   row.status = "VOID";
   return toPayment(row);
+}
+
+/* ------------------------------------------------------------------ *
+ * Dashboard (Phase 4)
+ * Every count and list below is computed here, tenant-scoped, so the
+ * UI never re-derives expiry, thresholds, or money totals.
+ * ------------------------------------------------------------------ */
+
+const NEEDS_REVIEW_DAYS = 90;
+
+export async function getDashboard(): Promise<DashboardSummary> {
+  await latency(280);
+  const members = tenantRows().map(toMember);
+  const active = members.filter((m) => m.displayStatus === "ACTIVE" || m.displayStatus === "EXPIRING");
+  const expiring = members.filter((m) => m.displayStatus === "EXPIRING");
+  const expired = members.filter((m) => m.displayStatus === "EXPIRED");
+  const needsReview = expired.filter((m) => (m.daysRemaining ?? 0) <= -NEEDS_REVIEW_DAYS);
+
+  const { gymId } = getTenantContext();
+  const monthPrefix = todayISO().slice(0, 7);
+  const monthPayments = paymentRows.filter(
+    (p) => p.gymId === gymId && p.status === "ACTIVE" && p.paymentDate.startsWith(monthPrefix),
+  );
+  const collected = monthPayments.reduce((sum, p) => sum + p.amount, 0);
+  const cash = monthPayments
+    .filter((p) => p.paymentMethod === "CASH")
+    .reduce((sum, p) => sum + p.amount, 0);
+
+  const byExpiry = (a: Member, b: Member) => (a.daysRemaining ?? 0) - (b.daysRemaining ?? 0);
+
+  return {
+    counts: {
+      total: members.filter((m) => m.lifecycle === "ACTIVE").length,
+      active: active.length,
+      expiring: expiring.length,
+      expired: expired.length,
+      leftGym: members.filter((m) => m.lifecycle === "LEFT_GYM").length,
+    },
+    collection: { monthTotal: collected, monthCash: cash, monthUpi: collected - cash },
+    expiringSoon: [...expiring].sort(byExpiry).slice(0, 5),
+    recentlyExpired: [...expired]
+      .filter((m) => (m.daysRemaining ?? 0) > -NEEDS_REVIEW_DAYS)
+      .sort((a, b) => (b.daysRemaining ?? 0) - (a.daysRemaining ?? 0))
+      .slice(0, 5),
+    needsReview: [...needsReview].sort(byExpiry).slice(0, 5),
+    needsReviewCount: needsReview.length,
+    recentMembers: [...members]
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id))
+      .slice(0, 5),
+  };
 }
