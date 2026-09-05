@@ -112,11 +112,52 @@ function MemberDetail({ member }: { member: Member }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
+  const [renewing, setRenewing] = useState(false);
+
+  const memberships = useQuery(membershipsQueryOptions(member.id));
+  const payments = useQuery(paymentsQueryOptions(member.id));
 
   const invalidate = async () => {
     await queryClient.invalidateQueries({ queryKey: ["member", member.id] });
     await queryClient.invalidateQueries({ queryKey: ["members"] });
+    await queryClient.invalidateQueries({ queryKey: ["memberships", member.id] });
+    await queryClient.invalidateQueries({ queryKey: ["payments", member.id] });
   };
+
+  const renew = useMutation({
+    mutationFn: (input: RenewInput) => membershipsApi.renew(member.id, input),
+    onSuccess: async () => {
+      await invalidate();
+      setRenewing(false);
+      toast.success("Membership renewed and payment recorded");
+    },
+    onError: (error) =>
+      toast.error(
+        error instanceof ApiClientError ? error.message : "Couldn't renew this membership.",
+      ),
+  });
+
+  const editAmount = useMutation({
+    mutationFn: ({ paymentId, amount }: { paymentId: string; amount: number }) =>
+      membershipsApi.updatePaymentAmount(paymentId, amount),
+    onSuccess: async () => {
+      await invalidate();
+      toast.success("Payment amount corrected");
+    },
+    onError: (error) =>
+      toast.error(error instanceof ApiClientError ? error.message : "Couldn't save that amount."),
+  });
+
+  const voidPay = useMutation({
+    mutationFn: (paymentId: string) => membershipsApi.voidPayment(paymentId),
+    onSuccess: async () => {
+      await invalidate();
+      toast.success("Payment voided — it stays in history");
+    },
+    onError: (error) =>
+      toast.error(error instanceof ApiClientError ? error.message : "Couldn't void that payment."),
+  });
+
 
   const update = useMutation({
     mutationFn: (values: MemberFormValues) =>
