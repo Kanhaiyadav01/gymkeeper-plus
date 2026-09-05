@@ -26,6 +26,7 @@ import type {
   PaymentMethod,
   RenewInput,
 } from "@/features/memberships/types";
+import type { DashboardSummary } from "@/features/dashboard/types";
 
 export class ApiClientError extends Error {
   code: string;
