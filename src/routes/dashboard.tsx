@@ -57,7 +57,7 @@ function DashboardPage() {
         {dashboard.isError ? (
           <div className="mt-4">
             <ErrorState
-              message="We couldn't load today's summary."
+              body="We couldn't load today's summary."
               onRetry={() => void dashboard.refetch()}
             />
           </div>

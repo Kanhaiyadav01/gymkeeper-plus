@@ -5,7 +5,7 @@ import { MemberAvatar } from "./MemberAvatar";
 import { cn } from "@/lib/utils";
 
 const NAV = [
-  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, enabled: false },
+  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, enabled: true },
   { to: "/members", label: "Members", icon: Users, enabled: true },
   { to: "/attendance", label: "Attendance", icon: Clock, enabled: false },
 ] as const;
