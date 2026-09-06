@@ -51,7 +51,7 @@ export function MemberMiniList({
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-medium">{m.name}</span>
                   <span className="block truncate text-xs text-muted-foreground">
-                    {m.memberNumber} · {expiryRelative(m.daysRemaining)}
+                    {m.memberNumber} · {expiryRelative(m.daysRemaining) ?? "no membership"}
                   </span>
                 </span>
                 {showStatus ? <StatusBadge status={m.displayStatus} /> : null}
