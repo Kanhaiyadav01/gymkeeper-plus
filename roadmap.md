@@ -7,5 +7,7 @@ Lovable is used only for UI/UX specification and screen prototyping.
 - [x] Product understanding + phase plan (approved as the product specification)
 - [x] Phase 2A UI/UX specification — /members, /members/new, /members/[id]
 - [x] Phase 3 screens — memberships + payments on the member profile (renew, history, edit amount, void)
-- [ ] Later phases (dashboard, attendance, lifecycle review, reports) — on request
+- [x] Phase 4 screen — dashboard action centre (counts, collection, alerts, needs review, quick actions)
+- [ ] Later phases (attendance, lifecycle review actions, reports) — on request
+
 

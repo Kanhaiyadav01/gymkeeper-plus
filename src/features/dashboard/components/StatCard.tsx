@@ -10,8 +10,8 @@ export interface StatCardProps {
 
 const TONES: Record<NonNullable<StatCardProps["tone"]>, string> = {
   default: "bg-secondary text-secondary-foreground",
-  warning: "bg-amber-100 text-amber-800",
-  danger: "bg-destructive/10 text-destructive",
+  warning: "bg-warning-soft text-warning",
+  danger: "bg-destructive-soft text-destructive",
 };
 
 export function StatCard({ label, value, icon: Icon, tone = "default" }: StatCardProps) {

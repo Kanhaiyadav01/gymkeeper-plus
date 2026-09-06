@@ -5,7 +5,7 @@ import { MemberAvatar } from "./MemberAvatar";
 import { cn } from "@/lib/utils";
 
 const NAV = [
-  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, enabled: false },
+  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, enabled: true },
   { to: "/members", label: "Members", icon: Users, enabled: true },
   { to: "/attendance", label: "Attendance", icon: Clock, enabled: false },
 ] as const;
@@ -14,6 +14,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const tenant = getTenantContext();
   const isMembers = pathname.startsWith("/members");
+  const isActive = (to: string) => (to === "/members" ? isMembers : pathname.startsWith(to));
+  const membersSearch = { q: "", status: "all", sort: "recent", page: 1 } as const;
 
   return (
     <div className="min-h-screen bg-background">
@@ -37,10 +39,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <Link
                 key={item.to}
                 to={item.to}
-                search={{ q: "", status: "all", sort: "recent", page: 1 }}
+                {...(item.to === "/members" ? { search: membersSearch } : {})}
                 className={cn(
                   "flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors",
-                  isMembers && item.to === "/members"
+                  isActive(item.to)
                     ? "bg-secondary text-secondary-foreground"
                     : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
                 )}
@@ -98,10 +100,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               {item.enabled ? (
                 <Link
                   to={item.to}
-                  search={{ q: "", status: "all", sort: "recent", page: 1 }}
+                  {...(item.to === "/members" ? { search: membersSearch } : {})}
                   className={cn(
                     "flex h-16 flex-col items-center justify-center gap-1 text-[11px] font-medium",
-                    isMembers && item.to === "/members"
+                    isActive(item.to)
                       ? "text-primary"
                       : "text-muted-foreground",
                   )}
