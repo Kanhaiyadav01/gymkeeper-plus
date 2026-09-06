@@ -27,6 +27,7 @@ import type {
   RenewInput,
 } from "@/features/memberships/types";
 import type { DashboardSummary } from "@/features/dashboard/types";
+import type { AttendanceRecord } from "@/features/attendance/types";
 
 export class ApiClientError extends Error {
   code: string;
@@ -524,6 +525,7 @@ export async function getDashboard(): Promise<DashboardSummary> {
       leftGym: members.filter((m) => m.lifecycle === "LEFT_GYM").length,
     },
     collection: { monthTotal: collected, monthCash: cash, monthUpi: collected - cash },
+    attendanceToday: countAttendanceToday(),
     expiringSoon: [...expiring].sort(byExpiry).slice(0, 5),
     recentlyExpired: [...expired]
       .filter((m) => (m.daysRemaining ?? 0) > -NEEDS_REVIEW_DAYS)
@@ -535,4 +537,115 @@ export async function getDashboard(): Promise<DashboardSummary> {
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id))
       .slice(0, 5),
   };
+}
+
+/* ------------------------------------------------------------------ *
+ * Attendance (Phase 5)
+ * One record per member per day, tenant-scoped. Uniqueness is enforced
+ * here the way UNIQUE(gymId, memberId, attendanceDate) enforces it in
+ * PostgreSQL — the UI never decides whether a mark is a duplicate.
+ * ------------------------------------------------------------------ */
+
+interface AttendanceRow {
+  id: string;
+  gymId: string;
+  memberId: string;
+  attendanceDate: string;
+  markedAt: string;
+}
+
+const attendanceRows: AttendanceRow[] = [];
+
+function toAttendance(row: AttendanceRow): AttendanceRecord {
+  const member = memberRows.find((m) => m.id === row.memberId)!;
+  return {
+    id: row.id,
+    memberId: row.memberId,
+    memberNumber: member.memberNumber,
+    memberName: member.name,
+    attendanceDate: row.attendanceDate,
+    markedAt: row.markedAt,
+  };
+}
+
+/** Lookup by serial number — the primary attendance workflow. */
+export async function findMemberByNumber(memberNumber: string): Promise<Member> {
+  await latency(180);
+  const row = tenantRows().find(
+    (r) => r.memberNumber.toLowerCase() === memberNumber.trim().toLowerCase(),
+  );
+  if (!row) {
+    throw new ApiClientError("MEMBER_NOT_FOUND", `No member with number ${memberNumber.trim()}.`);
+  }
+  return toMember(row);
+}
+
+/** Expired members can still be marked present — attendance is not gated on membership. */
+export async function markAttendance(
+  memberId: string,
+  attendanceDate: string = todayISO(),
+): Promise<AttendanceRecord> {
+  await latency(320);
+  const { gymId } = getTenantContext();
+  const member = requireRow(memberId);
+  const existing = attendanceRows.find(
+    (a) => a.gymId === gymId && a.memberId === member.id && a.attendanceDate === attendanceDate,
+  );
+  if (existing) {
+    throw new ApiClientError(
+      "ATTENDANCE_ALREADY_MARKED",
+      `${member.name} is already marked present today.`,
+    );
+  }
+  const row: AttendanceRow = {
+    id: nextId("att"),
+    gymId,
+    memberId: member.id,
+    attendanceDate,
+    markedAt: new Date().toISOString(),
+  };
+  attendanceRows.push(row);
+  return toAttendance(row);
+}
+
+/** Undo a mistaken mark for the same day. */
+export async function unmarkAttendance(attendanceId: string): Promise<{ id: string }> {
+  await latency(240);
+  const { gymId } = getTenantContext();
+  const index = attendanceRows.findIndex((a) => a.id === attendanceId && a.gymId === gymId);
+  if (index < 0) {
+    throw new ApiClientError("ATTENDANCE_NOT_FOUND", "This attendance record could not be found.");
+  }
+  attendanceRows.splice(index, 1);
+  return { id: attendanceId };
+}
+
+export async function listAttendanceByDate(
+  attendanceDate: string = todayISO(),
+): Promise<AttendanceRecord[]> {
+  await latency(220);
+  const { gymId } = getTenantContext();
+  return attendanceRows
+    .filter((a) => a.gymId === gymId && a.attendanceDate === attendanceDate)
+    .sort((a, b) => b.markedAt.localeCompare(a.markedAt))
+    .map(toAttendance);
+}
+
+export async function listMemberAttendance(
+  memberId: string,
+  limit = 30,
+): Promise<AttendanceRecord[]> {
+  await latency(200);
+  const row = requireRow(memberId);
+  return attendanceRows
+    .filter((a) => a.memberId === row.id)
+    .sort((a, b) => b.attendanceDate.localeCompare(a.attendanceDate))
+    .slice(0, limit)
+    .map(toAttendance);
+}
+
+export function countAttendanceToday(): number {
+  const { gymId } = getTenantContext();
+  const day = todayISO();
+  return attendanceRows.filter((a) => a.gymId === gymId && a.attendanceDate === day).length;
 }
