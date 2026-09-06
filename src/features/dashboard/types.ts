@@ -17,6 +17,8 @@ export interface DashboardCollection {
 export interface DashboardSummary {
   counts: DashboardCounts;
   collection: DashboardCollection;
+  /** Number of members marked present today. */
+  attendanceToday: number;
   expiringSoon: Member[];
   recentlyExpired: Member[];
   needsReview: Member[];
