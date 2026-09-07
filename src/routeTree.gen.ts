@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AttendanceRouteImport } from './routes/attendance'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as MembersIndexRouteImport } from './routes/members.index'
 import { Route as MembersMemberIdRouteImport } from './routes/members.$memberId'
@@ -18,6 +19,11 @@ import { Route as MembersNewRouteImport } from './routes/members.new'
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AttendanceRoute = AttendanceRouteImport.update({
+  id: '/attendance',
+  path: '/attendance',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardRoute = DashboardRouteImport.update({
@@ -43,6 +49,7 @@ const MembersNewRoute = MembersNewRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/attendance': typeof AttendanceRoute
   '/dashboard': typeof DashboardRoute
   '/members/$memberId': typeof MembersMemberIdRoute
   '/members/new': typeof MembersNewRoute
@@ -50,6 +57,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/attendance': typeof AttendanceRoute
   '/dashboard': typeof DashboardRoute
   '/members/$memberId': typeof MembersMemberIdRoute
   '/members/new': typeof MembersNewRoute
@@ -58,6 +66,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/attendance': typeof AttendanceRoute
   '/dashboard': typeof DashboardRoute
   '/members/$memberId': typeof MembersMemberIdRoute
   '/members/new': typeof MembersNewRoute
@@ -66,12 +75,24 @@ export interface FileRoutesById {
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    '/' | '/dashboard' | '/members/$memberId' | '/members/new' | '/members/'
+    | '/'
+    | '/attendance'
+    | '/dashboard'
+    | '/members/$memberId'
+    | '/members/new'
+    | '/members/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/dashboard' | '/members/$memberId' | '/members/new' | '/members'
+  to:
+    | '/'
+    | '/attendance'
+    | '/dashboard'
+    | '/members/$memberId'
+    | '/members/new'
+    | '/members'
   id:
     | '__root__'
     | '/'
+    | '/attendance'
     | '/dashboard'
     | '/members/$memberId'
     | '/members/new'
@@ -80,6 +101,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AttendanceRoute: typeof AttendanceRoute
   DashboardRoute: typeof DashboardRoute
   MembersMemberIdRoute: typeof MembersMemberIdRoute
   MembersNewRoute: typeof MembersNewRoute
@@ -93,6 +115,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/attendance': {
+      id: '/attendance'
+      path: '/attendance'
+      fullPath: '/attendance'
+      preLoaderRoute: typeof AttendanceRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dashboard': {
@@ -128,6 +157,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AttendanceRoute: AttendanceRoute,
   DashboardRoute: DashboardRoute,
   MembersMemberIdRoute: MembersMemberIdRoute,
   MembersNewRoute: MembersNewRoute,
