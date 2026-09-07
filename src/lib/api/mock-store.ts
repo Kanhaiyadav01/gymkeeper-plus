@@ -131,6 +131,7 @@ function seedMember(
     joiningDate: daysAgo(joinedDaysAgo),
     notes,
     lifecycle,
+    reviewedAt: null,
     createdAt: daysAgo(joinedDaysAgo),
   };
   memberRows.push(member);
@@ -329,6 +330,7 @@ export async function createMember(input: MemberInput): Promise<Member> {
     joiningDate: input.joiningDate,
     notes: input.notes.trim() || null,
     lifecycle: "ACTIVE",
+    reviewedAt: null,
     createdAt: todayISO(),
   };
   memberRows.push(row);
