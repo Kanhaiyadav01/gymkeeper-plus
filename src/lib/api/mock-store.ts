@@ -47,6 +47,8 @@ interface MemberRow {
   joiningDate: string;
   notes: string | null;
   lifecycle: "ACTIVE" | "LEFT_GYM";
+  /** Date the trainer last reviewed a long-expired member. */
+  reviewedAt: string | null;
   createdAt: string;
 }
 
