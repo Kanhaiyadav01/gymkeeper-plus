@@ -33,10 +33,7 @@ import {
   membershipsQueryOptions,
   paymentsQueryOptions,
 } from "@/features/memberships/api";
-import {
-  attendanceApi,
-  memberAttendanceQueryOptions,
-} from "@/features/attendance/api";
+import { memberAttendanceQueryOptions } from "@/features/attendance/api";
 import { AttendanceHistory } from "@/features/attendance/components/AttendanceHistory";
 import { MembershipHistory } from "@/features/memberships/components/MembershipHistory";
 import { PaymentHistory } from "@/features/memberships/components/PaymentHistory";
