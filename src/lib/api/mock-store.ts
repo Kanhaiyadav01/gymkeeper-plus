@@ -207,6 +207,7 @@ function toMember(row: MemberRow): Member {
     joiningDate: row.joiningDate,
     notes: row.notes,
     lifecycle: row.lifecycle,
+    reviewedAt: row.reviewedAt,
     currentMembership: ms
       ? {
           id: ms.id,
@@ -499,6 +500,40 @@ export async function voidPayment(paymentId: string): Promise<Payment> {
  * ------------------------------------------------------------------ */
 
 const NEEDS_REVIEW_DAYS = 90;
+/** After a "keep inactive" decision the member stays off the review list this long. */
+const REVIEW_SNOOZE_DAYS = 30;
+
+/**
+ * A member needs review when they are still on the books, expired for
+ * NEEDS_REVIEW_DAYS or more, and the trainer has not parked them recently.
+ * Computed here so no screen re-derives the rule.
+ */
+function needsReviewMembers(): Member[] {
+  return tenantRows()
+    .filter((row) => row.lifecycle === "ACTIVE")
+    .map((row) => ({ row, member: toMember(row) }))
+    .filter(({ row, member }) => {
+      if (member.displayStatus !== "EXPIRED") return false;
+      if ((member.daysRemaining ?? 0) > -NEEDS_REVIEW_DAYS) return false;
+      if (!row.reviewedAt) return true;
+      return differenceInCalendarDays(parse(todayISO()), parse(row.reviewedAt)) >= REVIEW_SNOOZE_DAYS;
+    })
+    .map(({ member }) => member)
+    .sort((a, b) => (a.daysRemaining ?? 0) - (b.daysRemaining ?? 0));
+}
+
+export async function listNeedsReview(): Promise<Member[]> {
+  await latency(240);
+  return needsReviewMembers();
+}
+
+/** "Keep inactive": no record changes, the member is just parked for now. */
+export async function keepMemberInactive(memberId: string): Promise<Member> {
+  await latency(280);
+  const row = requireRow(memberId);
+  row.reviewedAt = todayISO();
+  return toMember(row);
+}
 
 export async function getDashboard(): Promise<DashboardSummary> {
   await latency(280);
@@ -506,7 +541,7 @@ export async function getDashboard(): Promise<DashboardSummary> {
   const active = members.filter((m) => m.displayStatus === "ACTIVE" || m.displayStatus === "EXPIRING");
   const expiring = members.filter((m) => m.displayStatus === "EXPIRING");
   const expired = members.filter((m) => m.displayStatus === "EXPIRED");
-  const needsReview = expired.filter((m) => (m.daysRemaining ?? 0) <= -NEEDS_REVIEW_DAYS);
+  const needsReview = needsReviewMembers();
 
   const { gymId } = getTenantContext();
   const monthPrefix = todayISO().slice(0, 7);
@@ -535,7 +570,7 @@ export async function getDashboard(): Promise<DashboardSummary> {
       .filter((m) => (m.daysRemaining ?? 0) > -NEEDS_REVIEW_DAYS)
       .sort((a, b) => (b.daysRemaining ?? 0) - (a.daysRemaining ?? 0))
       .slice(0, 5),
-    needsReview: [...needsReview].sort(byExpiry).slice(0, 5),
+    needsReview: needsReview.slice(0, 5),
     needsReviewCount: needsReview.length,
     recentMembers: [...members]
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id))
