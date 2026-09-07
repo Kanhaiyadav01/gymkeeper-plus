@@ -4,6 +4,7 @@ import {
   AlertTriangle,
   CalendarClock,
   ClipboardList,
+  CalendarCheck,
   IndianRupee,
   UserPlus,
   Users,
@@ -101,6 +102,30 @@ function DashboardPage() {
                   <p className="text-xs text-muted-foreground">
                     {formatRupees(data.collection.monthCash)} cash ·{" "}
                     {formatRupees(data.collection.monthUpi)} UPI
+                  </p>
+                </>
+              )}
+            </section>
+
+            <section className="mt-4 rounded-xl border border-border bg-card p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <CalendarCheck className="size-4 text-muted-foreground" aria-hidden />
+                  <h2 className="text-sm font-semibold">Attendance today</h2>
+                </div>
+                <Button asChild variant="ghost" size="sm">
+                  <Link to="/attendance">Mark attendance</Link>
+                </Button>
+              </div>
+              {dashboard.isPending || !data ? (
+                <Skeleton className="mt-3 h-9 w-24" />
+              ) : (
+                <>
+                  <p className="mt-2 text-2xl font-semibold tabular-nums">
+                    {data.attendanceToday}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {data.attendanceToday === 1 ? "member" : "members"} marked present today
                   </p>
                 </>
               )}

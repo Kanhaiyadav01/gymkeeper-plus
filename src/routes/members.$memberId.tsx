@@ -33,6 +33,11 @@ import {
   membershipsQueryOptions,
   paymentsQueryOptions,
 } from "@/features/memberships/api";
+import {
+  attendanceApi,
+  memberAttendanceQueryOptions,
+} from "@/features/attendance/api";
+import { AttendanceHistory } from "@/features/attendance/components/AttendanceHistory";
 import { MembershipHistory } from "@/features/memberships/components/MembershipHistory";
 import { PaymentHistory } from "@/features/memberships/components/PaymentHistory";
 import { RenewSheet } from "@/features/memberships/components/RenewSheet";
@@ -116,6 +121,7 @@ function MemberDetail({ member }: { member: Member }) {
 
   const memberships = useQuery(membershipsQueryOptions(member.id));
   const payments = useQuery(paymentsQueryOptions(member.id));
+  const attendance = useQuery(memberAttendanceQueryOptions(member.id));
 
   const invalidate = async () => {
     await queryClient.invalidateQueries({ queryKey: ["member", member.id] });
@@ -249,6 +255,12 @@ function MemberDetail({ member }: { member: Member }) {
           onEditAmount={(paymentId, amount) => editAmount.mutate({ paymentId, amount })}
           onVoid={(paymentId) => voidPay.mutate(paymentId)}
           mutating={editAmount.isPending || voidPay.isPending}
+        />
+        <AttendanceHistory
+          records={attendance.data}
+          isPending={attendance.isPending}
+          isError={attendance.isError}
+          onRetry={() => void attendance.refetch()}
         />
       </div>
 
