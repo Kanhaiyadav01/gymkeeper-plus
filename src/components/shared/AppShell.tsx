@@ -1,5 +1,14 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { ClipboardList, Clock, Dumbbell, LayoutDashboard, LogOut, Users } from "lucide-react";
+import {
+  BarChart3,
+  ClipboardList,
+  Clock,
+  Dumbbell,
+  LayoutDashboard,
+  LogOut,
+  Users,
+} from "lucide-react";
+import { ThemeToggle } from "./ThemeToggle";
 import { getTenantContext } from "@/lib/api/tenant";
 import { MemberAvatar } from "./MemberAvatar";
 import { cn } from "@/lib/utils";
@@ -9,6 +18,7 @@ const NAV = [
   { to: "/members", label: "Members", icon: Users, enabled: true },
   { to: "/attendance", label: "Attendance", icon: Clock, enabled: true },
   { to: "/review", label: "Review", icon: ClipboardList, enabled: true },
+  { to: "/reports", label: "Reports", icon: BarChart3, enabled: true },
 ] as const;
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -32,6 +42,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               ACADEMY
             </span>
           </span>
+          <ThemeToggle className="ml-auto" />
         </div>
 
         <nav className="flex-1 space-y-1 px-3 py-2" aria-label="Main">
@@ -95,7 +106,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         aria-label="Main"
         className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card pb-[env(safe-area-inset-bottom)] lg:hidden"
       >
-        <ul className="grid grid-cols-4">
+        <ul className="grid grid-cols-5">
           {NAV.map((item) => (
             <li key={item.to}>
               {item.enabled ? (

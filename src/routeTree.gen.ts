@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AttendanceRouteImport } from './routes/attendance'
 import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as ReportsRouteImport } from './routes/reports'
 import { Route as ReviewRouteImport } from './routes/review'
 import { Route as MembersIndexRouteImport } from './routes/members.index'
 import { Route as MembersMemberIdRouteImport } from './routes/members.$memberId'
@@ -30,6 +31,11 @@ const AttendanceRoute = AttendanceRouteImport.update({
 const DashboardRoute = DashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReportsRoute = ReportsRouteImport.update({
+  id: '/reports',
+  path: '/reports',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ReviewRoute = ReviewRouteImport.update({
@@ -57,6 +63,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/attendance': typeof AttendanceRoute
   '/dashboard': typeof DashboardRoute
+  '/reports': typeof ReportsRoute
   '/review': typeof ReviewRoute
   '/members/$memberId': typeof MembersMemberIdRoute
   '/members/new': typeof MembersNewRoute
@@ -66,6 +73,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/attendance': typeof AttendanceRoute
   '/dashboard': typeof DashboardRoute
+  '/reports': typeof ReportsRoute
   '/review': typeof ReviewRoute
   '/members/$memberId': typeof MembersMemberIdRoute
   '/members/new': typeof MembersNewRoute
@@ -76,6 +84,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/attendance': typeof AttendanceRoute
   '/dashboard': typeof DashboardRoute
+  '/reports': typeof ReportsRoute
   '/review': typeof ReviewRoute
   '/members/$memberId': typeof MembersMemberIdRoute
   '/members/new': typeof MembersNewRoute
@@ -87,6 +96,7 @@ export interface FileRouteTypes {
     | '/'
     | '/attendance'
     | '/dashboard'
+    | '/reports'
     | '/review'
     | '/members/$memberId'
     | '/members/new'
@@ -96,6 +106,7 @@ export interface FileRouteTypes {
     | '/'
     | '/attendance'
     | '/dashboard'
+    | '/reports'
     | '/review'
     | '/members/$memberId'
     | '/members/new'
@@ -105,6 +116,7 @@ export interface FileRouteTypes {
     | '/'
     | '/attendance'
     | '/dashboard'
+    | '/reports'
     | '/review'
     | '/members/$memberId'
     | '/members/new'
@@ -115,6 +127,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AttendanceRoute: typeof AttendanceRoute
   DashboardRoute: typeof DashboardRoute
+  ReportsRoute: typeof ReportsRoute
   ReviewRoute: typeof ReviewRoute
   MembersMemberIdRoute: typeof MembersMemberIdRoute
   MembersNewRoute: typeof MembersNewRoute
@@ -142,6 +155,13 @@ declare module '@tanstack/react-router' {
       path: '/dashboard'
       fullPath: '/dashboard'
       preLoaderRoute: typeof DashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reports': {
+      id: '/reports'
+      path: '/reports'
+      fullPath: '/reports'
+      preLoaderRoute: typeof ReportsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/review': {
@@ -179,6 +199,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AttendanceRoute: AttendanceRoute,
   DashboardRoute: DashboardRoute,
+  ReportsRoute: ReportsRoute,
   ReviewRoute: ReviewRoute,
   MembersMemberIdRoute: MembersMemberIdRoute,
   MembersNewRoute: MembersNewRoute,

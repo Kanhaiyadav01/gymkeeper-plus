@@ -28,6 +28,7 @@ import type {
 } from "@/features/memberships/types";
 import type { DashboardSummary } from "@/features/dashboard/types";
 import type { AttendanceRecord } from "@/features/attendance/types";
+import type { ReportPeriod, ReportSummary } from "@/features/reports/types";
 
 export class ApiClientError extends Error {
   code: string;
@@ -687,4 +688,77 @@ export function countAttendanceToday(): number {
   const { gymId } = getTenantContext();
   const day = todayISO();
   return attendanceRows.filter((a) => a.gymId === gymId && a.attendanceDate === day).length;
+}
+
+/* ------------------------------------------------------------------ *
+ * Reports (Phase 7)
+ * Every figure is aggregated here, tenant-scoped, for a date range the
+ * caller names by period. The UI never sums money or counts rows.
+ * ------------------------------------------------------------------ */
+
+function periodRange(period: ReportPeriod): { from: string; to: string; label: string } {
+  const now = today();
+  if (period === "this_month") {
+    const from = iso(new Date(now.getFullYear(), now.getMonth(), 1));
+    return { from, to: todayISO(), label: format(now, "MMMM yyyy") };
+  }
+  if (period === "last_month") {
+    const first = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const last = new Date(now.getFullYear(), now.getMonth(), 0);
+    return { from: iso(first), to: iso(last), label: format(first, "MMMM yyyy") };
+  }
+  const from = iso(new Date(now.getFullYear(), now.getMonth() - 11, 1));
+  return { from, to: todayISO(), label: "Last 12 months" };
+}
+
+const inRange = (date: string, from: string, to: string) => date >= from && date <= to;
+
+export async function getReport(period: ReportPeriod): Promise<ReportSummary> {
+  await latency(320);
+  const { gymId } = getTenantContext();
+  const { from, to, label } = periodRange(period);
+  const members = tenantRows().map(toMember);
+
+  const payments = paymentRows.filter(
+    (p) => p.gymId === gymId && p.status === "ACTIVE" && inRange(p.paymentDate, from, to),
+  );
+  const sum = (rows: PaymentRow[]) => rows.reduce((total, p) => total + p.amount, 0);
+  const cash = sum(payments.filter((p) => p.paymentMethod === "CASH"));
+  const upi = sum(payments.filter((p) => p.paymentMethod === "UPI"));
+
+  const attendance = attendanceRows.filter(
+    (a) => a.gymId === gymId && inRange(a.attendanceDate, from, to),
+  );
+  const attendanceDays = new Set(attendance.map((a) => a.attendanceDate)).size;
+
+  const renewals = membershipRows.filter(
+    (m) => m.gymId === gymId && inRange(m.createdAt, from, to),
+  );
+
+  return {
+    period,
+    periodLabel: label,
+    from,
+    to,
+    members: {
+      total: members.filter((m) => m.lifecycle === "ACTIVE").length,
+      active: members.filter(
+        (m) => m.displayStatus === "ACTIVE" || m.displayStatus === "EXPIRING",
+      ).length,
+      joined: members.filter((m) => inRange(m.joiningDate, from, to)).length,
+      leftGym: members.filter((m) => m.lifecycle === "LEFT_GYM").length,
+    },
+    collection: {
+      total: cash + upi,
+      cash,
+      upi,
+      paymentCount: payments.length,
+      membershipsSold: renewals.length,
+    },
+    attendance: {
+      visits: attendance.length,
+      uniqueMembers: new Set(attendance.map((a) => a.memberId)).size,
+      averagePerDay: attendanceDays === 0 ? 0 : Math.round(attendance.length / attendanceDays),
+    },
+  };
 }
