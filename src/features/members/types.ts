@@ -23,6 +23,8 @@ export interface Member {
   joiningDate: string;
   notes: string | null;
   lifecycle: MemberLifecycle;
+  /** Date the trainer last parked this member during review, if ever. */
+  reviewedAt: string | null;
   currentMembership: MembershipSummary | null;
   /** Derived by the server. The UI never recomputes expiry. */
   displayStatus: MemberDisplayStatus;
