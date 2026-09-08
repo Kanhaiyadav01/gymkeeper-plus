@@ -181,10 +181,12 @@ function DashboardPage() {
                 members={data?.needsReview ?? []}
                 isPending={dashboard.isPending}
                 action={
-                  <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <ClipboardList className="size-3.5" aria-hidden />
-                    3+ months expired
-                  </span>
+                  <Button asChild variant="ghost" size="sm">
+                    <Link to="/review">
+                      <ClipboardList className="size-3.5" aria-hidden />
+                      Review
+                    </Link>
+                  </Button>
                 }
               />
 

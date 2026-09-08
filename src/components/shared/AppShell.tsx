@@ -1,5 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Clock, Dumbbell, LayoutDashboard, LogOut, Users } from "lucide-react";
+import { ClipboardList, Clock, Dumbbell, LayoutDashboard, LogOut, Users } from "lucide-react";
 import { getTenantContext } from "@/lib/api/tenant";
 import { MemberAvatar } from "./MemberAvatar";
 import { cn } from "@/lib/utils";
@@ -8,6 +8,7 @@ const NAV = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, enabled: true },
   { to: "/members", label: "Members", icon: Users, enabled: true },
   { to: "/attendance", label: "Attendance", icon: Clock, enabled: true },
+  { to: "/review", label: "Review", icon: ClipboardList, enabled: true },
 ] as const;
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -94,7 +95,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         aria-label="Main"
         className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card pb-[env(safe-area-inset-bottom)] lg:hidden"
       >
-        <ul className="grid grid-cols-3">
+        <ul className="grid grid-cols-4">
           {NAV.map((item) => (
             <li key={item.to}>
               {item.enabled ? (
