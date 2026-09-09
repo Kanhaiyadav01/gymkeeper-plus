@@ -1,6 +1,6 @@
 # GymFlow Pro
 
-# FITKING'S ACADEMY — MASTER BUILD PROMPT
+# FITKING'S ACADEMY 
 
 You are building a real production-oriented gym management application called:
 
